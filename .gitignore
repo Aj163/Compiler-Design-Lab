@@ -1,3 +1,4 @@
 *.out
 lex.yy.c
 *.in
+y.tab.c
