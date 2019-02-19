@@ -2,3 +2,5 @@
 lex.yy.c
 *.in
 y.tab.c
+test*.c
+y.tab.h
