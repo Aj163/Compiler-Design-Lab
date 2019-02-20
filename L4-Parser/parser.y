@@ -4,7 +4,7 @@
     #include <stdlib.h>
 
     #define MOD 1007
-    #define P 23
+    #define PRIME 23
 
     #define YYSTYPE char*
     #include "lex.yy.c"
@@ -28,7 +28,7 @@
         int len = strlen(str);
         int hashValue = 0;
         for(int i=0; i<len; i++)
-            hashValue = (hashValue * P + str[i]) % MOD;
+            hashValue = (hashValue * PRIME + str[i]) % MOD;
 
         return hashValue;
     }
