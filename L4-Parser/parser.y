@@ -1,78 +1,27 @@
 %{
-    #include <string.h>
-    #include <stdio.h>
-    #include <stdlib.h>
-
-    #define MOD 1007
-    #define PRIME 23
-
+    #include "symbol_table.c"
     #define YYSTYPE char*
     #include "lex.yy.c"
 
-    int yylex();
-    void yyerror(char *);
     extern int yylineno;
+    void yyerror(char *s) {
 
+        fprintf(stderr, "%s\n", s);
+    }
     char type[100];
-
-    typedef struct Node{
-        char name[100], type[100];
-        int lineNo;
-        struct Node *next;
-    } node;
-
-    node *symbolTable[MOD] = {NULL};
-
-    int hash(const char *str) {
-
-        int len = strlen(str);
-        int hashValue = 0;
-        for(int i=0; i<len; i++)
-            hashValue = (hashValue * PRIME + str[i]) % MOD;
-
-        return hashValue;
-    }
-
-    node *lookup(const char *str) {
-
-        int len = strlen(str);
-        int hashValue = hash(str);
-
-        node *temp = symbolTable[hashValue];
-        while(temp != NULL) {
-            if(!strcmp(str, temp->name))
-                return temp;
-            temp = temp->next;
-        }
-
-        return NULL;
-    }
-
-    void insert(int lineNo, const char *name, const char *type) {
-
-        if(lookup(name) != NULL)
-            return;
-
-        node *temp = malloc(sizeof(node));
-        strcpy(temp->name, name);
-        strcpy(temp->type, type);
-        temp->lineNo = lineNo;
-
-        int hashValue = hash(name);
-
-        temp->next = symbolTable[hashValue];
-        symbolTable[hashValue] = temp;
-    }
 %}
 
-%token INT MAIN FOR RETURN 
+%token INT MAIN FOR RETURN IF ELSE
 %token STRING_CONSTANT INTEGER_CONSTANT FLOAT_CONSTANT IDENTIFIER
 %token INCREMENT DECREMENT PLUSEQ
 
-%left '>' '<'
+%left '>' '<' '=' PLUSEQ
 %left '+' '-'
 %left '*' '/' '%'
-%left '=' PLUSEQ
+%left INCREMENT DECREMENT
+
+%nonassoc IfWithoutElse
+%nonassoc ELSE
 
 %%
 Global
@@ -114,6 +63,10 @@ Expression
 
 Term
     : IDENTIFIER
+    | INCREMENT IDENTIFIER
+    | IDENTIFIER INCREMENT
+    | DECREMENT IDENTIFIER
+    | IDENTIFIER DECREMENT
     | INTEGER_CONSTANT
     | FLOAT_CONSTANT
     | STRING_CONSTANT
@@ -130,29 +83,41 @@ DataType
     ;
 
 FunDef
-    : DataType IDENTIFIER '(' ParamList ')' '{' StatList '}'        { insert(yylineno, $2, type); }
-    | DataType MAIN '(' ParamList ')' '{' StatList '}'              { insert(yylineno, $2, type); }
-    | DataType IDENTIFIER '(' ')' '{' StatList '}'                  { insert(yylineno, $2, type); }
-    | DataType MAIN '(' ')' '{' StatList '}'                        { insert(yylineno, $2, type); }
+    : DataType IDENTIFIER '(' ParamList ')' CompundStat             { insert(yylineno, $2, type); }
+    | DataType MAIN '(' ParamList ')' CompundStat                   { insert(yylineno, $2, type); }
+    | DataType IDENTIFIER '(' ')' CompundStat                       { insert(yylineno, $2, type); }
+    | DataType MAIN '(' ')' CompundStat                             { insert(yylineno, $2, type); }
     ;
 
+CompundStat
+    : '{' StatList '}'
+
 StatList
-    : SingleStat ';' StatList
-    | '{' StatList '}' StatList
+    : SingleStat StatList
+    | CompundStat StatList
     |
     ;
 
 SingleStat
-    : Expression
-    | VarDec
+    : Expression ';'
+    | VarDec ';'
     | ForStat
-    | ReturnStat
-    |
+    | ReturnStat ';'
+    | ';'
+    | IfStat
     ;
 
+IfStat
+    : IF '(' Expression ')' CompundStat                     %prec IfWithoutElse
+    | IF '(' Expression ')' SingleStat                     %prec IfWithoutElse
+    | IF '(' Expression ')' CompundStat ELSE CompundStat    %prec ELSE
+    | IF '(' Expression ')' SingleStat ELSE CompundStat     %prec ELSE
+    | IF '(' Expression ')' CompundStat ELSE SingleStat     %prec ELSE
+    | IF '(' Expression ')' SingleStat ELSE SingleStat      %prec ELSE
+
 ForStat
-    : FOR '(' VarDec ';' Expression ';' Expression ')' '{' StatList '}'
-    | FOR '(' Expression ';' Expression ';' Expression ')' '{' StatList '}'
+    : FOR '(' VarDec ';' Expression ';' Expression ')' CompundStat
+    | FOR '(' Expression ';' Expression ';' Expression ')' CompundStat
     | FOR '(' VarDec ';' Expression ';' Expression ')' SingleStat
     | FOR '(' Expression ';' Expression ';' Expression ')' SingleStat
     ;
@@ -171,27 +136,6 @@ ArgList
     | Expression
     ;
 %%
-
-void yyerror(char *s) {
-
-    fprintf(stderr, "%s\n", s);
-}
-
-void printSymbolTable() {
-
-    printf("--------------------------------------------------------------------------\n");
-    printf("|%-10s|%-20s|%-40s|\n", "Line No", "Data Type", "Name");
-    printf("--------------------------------------------------------------------------\n");
-    node *temp;
-    for(int i=0; i<MOD; i++) {
-        temp = symbolTable[i];
-        while(temp != NULL) {
-            printf("|%-10d|%-20s|%-40s|\n", temp->lineNo, temp->type, temp->name);
-            temp = temp->next;
-        }
-    }
-    printf("--------------------------------------------------------------------------\n");
-}
 
 int main() {
 
