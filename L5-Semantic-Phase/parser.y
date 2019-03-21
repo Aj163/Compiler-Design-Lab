@@ -2,14 +2,23 @@
     #include "symbol_table.c"
 %}
 
-%token CHAR INT MAIN FOR RETURN IF ELSE
-%token STRING_CONSTANT INTEGER_CONSTANT FLOAT_CONSTANT IDENTIFIER
-%token INCREMENT DECREMENT PLUSEQ
+%union {
+    char *str;
+    int intval;
+}
 
-%left '>' '<' '=' PLUSEQ
+%token <str> CHAR INT MAIN FOR RETURN IF ELSE VOID
+%token <str> STRING_CONSTANT INTEGER_CONSTANT FLOAT_CONSTANT IDENTIFIER
+%token <str> INCREMENT DECREMENT PLUSEQ
+
+%left '=' PLUSEQ
+%left '>' '<'
 %left '+' '-'
 %left '*' '/' '%'
 %left INCREMENT DECREMENT
+
+%type <str> DataType
+%type <intval> ConstExpression ParamList ListOfParams ArgList Expression
 
 %nonassoc IfWithoutElse
 %nonassoc ELSE
@@ -23,15 +32,23 @@ Global
     ;
 
 FunDec
-    : DataType IDENTIFIER ParanthesisOpen ParamList ParanthesisClose ';'    { redeclared($2); insert(yylineno, $2, $1, curr_scope); }
-    | DataType IDENTIFIER ParanthesisOpen ParanthesisClose ';'              { redeclared($2); insert(yylineno, $2, $1, curr_scope); }
+    : DataType IDENTIFIER ParenthesisOpen ParamList ParenthesisClose ';'    { 
+        redeclared($2); 
+        node *temp = insert(yylineno, $2, $1, curr_scope); 
+        temp->num_params = $4;
+    }
+    | DataType IDENTIFIER ParenthesisOpen ParenthesisClose ';'              { 
+        redeclared($2); 
+        node *temp = insert(yylineno, $2, $1, curr_scope); 
+        temp->num_params = 0;
+    }
     ;
 
-ParanthesisOpen
+ParenthesisOpen
     : '('                                                                   { curr_scope++; } 
     ;
 
-ParanthesisClose
+ParenthesisClose
     : ')'                                                                   { curr_scope--; }        
     ;
 
@@ -42,22 +59,36 @@ VarDec
 VarList
     : IDENTIFIER                                                    { redeclared($1); insert(yylineno, $1, type, curr_scope); }
     | IDENTIFIER ',' VarList                                        { redeclared($1); insert(yylineno, $1, type, curr_scope); }
+    | IDENTIFIER '[' ConstExpression ']'                            { arraySizeCheck($3, $1); redeclared($1); insert(yylineno, $1, type, curr_scope); }
+    | IDENTIFIER '[' ConstExpression ']' ',' VarList                { arraySizeCheck($3, $1); redeclared($1); insert(yylineno, $1, type, curr_scope); }
     | IDENTIFIER '=' Expression ',' VarList                         { redeclared($1); insert(yylineno, $1, type, curr_scope); }
     | IDENTIFIER '=' Expression                                     { redeclared($1); insert(yylineno, $1, type, curr_scope); }
     ;
 
+ConstExpression
+    : INTEGER_CONSTANT                                      { $$ = atoi($1); }
+    | ConstExpression '+' ConstExpression                   { $$ = $1 + $3; }
+    | ConstExpression '-' ConstExpression                   { $$ = $1 - $3; }
+    | ConstExpression '*' ConstExpression                   { $$ = $1 * $3; }
+    | ConstExpression '/' ConstExpression                   { divByZero($3); $$ = $1 / $3; }
+    | ConstExpression '%' ConstExpression                   { $$ = $1 % $3; }
+    | ConstExpression '<' ConstExpression                   { $$ = $1 < $3; }
+    | ConstExpression '>' ConstExpression                   { $$ = $1 > $3; }
+    | '(' ConstExpression ')'                               { $$ = $2; }
+    ;
+
 Expression
-    : Term
-    | Expression '+' Expression
-    | Expression '<' Expression
-    | Expression '>' Expression
-    | Expression '-' Expression
-    | Expression '*' Expression
-    | Expression '/' Expression
-    | Expression '%' Expression
-    | Expression '=' Expression
-    | Expression PLUSEQ Expression
-    | '(' Expression ')'
+    : Term                                                  { $$ = 0; }
+    | Expression '+' Expression                             { lvalue_check($3); $$ = 0; }
+    | Expression '<' Expression                             { lvalue_check($3); $$ = 0; }
+    | Expression '>' Expression                             { lvalue_check($3); $$ = 0; }
+    | Expression '-' Expression                             { lvalue_check($3); $$ = 0; }
+    | Expression '*' Expression                             { lvalue_check($3); $$ = 0; }
+    | Expression '/' Expression                             { lvalue_check($3); $$ = 0; }
+    | Expression '%' Expression                             { lvalue_check($3); $$ = 0; }
+    | IDENTIFIER '=' Expression                             { $$ = 1; }
+    | Expression PLUSEQ Expression                          { $$ = 1; }
+    | '(' Expression ')'                                    { $$ = 0; }
     ;
 
 Term
@@ -72,27 +103,49 @@ Term
     | FuncCall
     ;
 
+ListOfParams
+    : DataType IDENTIFIER ',' ListOfParams                      { $$ = $4 +1;   voidCheck($1); redeclared($2); insert(yylineno, $2, $1, curr_scope); }
+    | DataType IDENTIFIER                                       { $$ = 1;       voidCheck($1); redeclared($2); insert(yylineno, $2, $1, curr_scope); }
+    ;
+
 ParamList
-    : DataType IDENTIFIER ',' ParamList                                             { redeclared($2); insert(yylineno, $2, $1, curr_scope); }
-    | DataType IDENTIFIER                                                           { redeclared($2); insert(yylineno, $2, $1, curr_scope); }
+    : VOID                                                      { $$ = 0;  }
+    | ListOfParams                                              { $$ = $1; }
     ;
 
 DataType
-    : INT                                                                           { strcpy($$, $1); strcpy(type, $1); }
-    | CHAR                                                                          { strcpy($$, $1); strcpy(type, $1); }
+    : INT                                                       { strcpy($$, $1); strcpy(type, $1); }
+    | CHAR                                                      { strcpy($$, $1); strcpy(type, $1); }
+    | VOID                                                      { strcpy($$, $1); strcpy(type, $1); }
     ;
 
 FunDef
-    : DataType IDENTIFIER ParanthesisOpen ParamList ParanthesisClose CompundStat    { redeclared($2); insert(yylineno, $2, $1, curr_scope); }
-    | DataType MAIN ParanthesisOpen ParamList ParanthesisClose CompundStat          { redeclared($2); insert(yylineno, $2, $1, curr_scope); }
-    | DataType IDENTIFIER ParanthesisOpen ParanthesisClose CompundStat              { redeclared($2); insert(yylineno, $2, $1, curr_scope); }
-    | DataType MAIN ParanthesisOpen ParanthesisClose CompundStat                    { redeclared($2); insert(yylineno, $2, $1, curr_scope); }
+    : DataType IDENTIFIER ParenthesisOpen ParamList ParenthesisClose CompundStat    { 
+        redeclared($2); 
+        node *temp = insert(yylineno, $2, $1, curr_scope);
+        temp->num_params = $4;
+    }
+    | DataType MAIN ParenthesisOpen ParamList ParenthesisClose CompundStat          { 
+        redeclared($2); 
+        node *temp = insert(yylineno, $2, $1, curr_scope); 
+        temp->num_params = $4;
+    }
+    | DataType IDENTIFIER ParenthesisOpen ParenthesisClose CompundStat              { 
+        redeclared($2); 
+        node *temp = insert(yylineno, $2, $1, curr_scope);
+        temp->num_params = 0;
+    }
+    | DataType MAIN ParenthesisOpen ParenthesisClose CompundStat                    { 
+        redeclared($2); 
+        node *temp = insert(yylineno, $2, $1, curr_scope); 
+        temp->num_params = 0;
+    }
     ;
 
 CompundStat
-    : '{'                                                                           { curr_scope++; }
+    :   '{'                                                                         { curr_scope++; }
         StatList
-        '}' {
+        '}'                                                                         {
             while(stack[tos]->scope == curr_scope)
                 tos--;
             curr_scope--;
@@ -133,13 +186,13 @@ ReturnStat
     | RETURN
 
 FuncCall
-    : IDENTIFIER '(' ArgList ')'
-    | IDENTIFIER '(' ')'
+    : IDENTIFIER '(' ArgList ')'                                                { not_declared($1); not_function($1); num_param_check($1, $3); }
+    | IDENTIFIER '(' ')'                                                        { not_declared($1); not_function($1); num_param_check($1, 0);  }
     ;
 
 ArgList
-    : Expression ',' ArgList
-    | Expression
+    : Expression ',' ArgList                                                    { $$ = $3 + 1; }
+    | Expression                                                                { $$ = 1;      }
     ;
 %%
 
@@ -153,3 +206,16 @@ int main() {
     yyparse();
     printSymbolTable();
 }
+
+/*
+
+Semantic Errors
+- Redeclaration
+- Not declared
+- Array size evaluation
+- Void parameters
+- Not a function
+- Number of parameters do not match
+- LHS of assignment should be a single variable
+
+*/
