@@ -4,3 +4,4 @@ lex.yy.c
 y.tab.c
 test*.c
 y.tab.h
+.vscode/
