@@ -10,6 +10,7 @@ reg_node *icg_stack[MOD];
 int icg_tos = -1;
 int t_ctr = -1;
 int tac_lineno = 1;
+int label_num = 1;
 
 void print_reg(reg_node *temp) {
 

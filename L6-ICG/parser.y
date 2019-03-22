@@ -18,7 +18,7 @@
 %left INCREMENT DECREMENT
 
 %type <str> DataType
-%type <intval> ConstExpression ParamList ListOfParams ArgList Expression
+%type <intval> ConstExpression ParamList ListOfParams ArgList Expression IfTAC_Print ElseTAC_Print
 
 %nonassoc IfWithoutElse
 %nonassoc ELSE
@@ -61,8 +61,29 @@ VarList
     | IDENTIFIER ',' VarList                                        { redeclared($1); insert(yylineno, $1, type, curr_scope); }
     | IDENTIFIER '[' ConstExpression ']'                            { arraySizeCheck($3, $1); redeclared($1); insert(yylineno, $1, type, curr_scope); }
     | IDENTIFIER '[' ConstExpression ']' ',' VarList                { arraySizeCheck($3, $1); redeclared($1); insert(yylineno, $1, type, curr_scope); }
-    | IDENTIFIER '=' Expression ',' VarList                         { redeclared($1); insert(yylineno, $1, type, curr_scope); }
-    | IDENTIFIER '=' Expression                                     { redeclared($1); insert(yylineno, $1, type, curr_scope); }
+    | IDENTIFIER '=' Expression                                     { 
+        
+            redeclared($1); 
+            insert(yylineno, $1, type, curr_scope); 
+            reg_node *op = pop(); 
+
+            printf("%5d. ", tac_lineno++);
+            printf("%s = ", $1);
+            print_reg(op);
+            printf("\n"); 
+        }
+        ',' VarList  
+    | IDENTIFIER '=' Expression                                     { 
+        
+        redeclared($1); 
+        insert(yylineno, $1, type, curr_scope); 
+        reg_node *op = pop(); 
+
+        printf("%5d. ", tac_lineno++);
+        printf("%s = ", $1);
+        print_reg(op);
+        printf("\n"); 
+    }
     ;
 
 ConstExpression
@@ -94,8 +115,36 @@ Expression
         print_reg(op2);
         printf("\n"); 
     }
-    | Expression '<' Expression                             { lvalue_check($3); $$ = 0; }
-    | Expression '>' Expression                             { lvalue_check($3); $$ = 0; }
+    | Expression '<' Expression                             { 
+        
+        lvalue_check($3); 
+        $$ = 0; 
+        reg_node *op2 = pop(), *op1 = pop(), *temp = newNode("t", ++t_ctr); 
+        icg_stack[++icg_tos] = temp; 
+
+        printf("%5d. ", tac_lineno++);
+        print_reg(temp);
+        printf(" = ");
+        print_reg(op1);
+        printf(" < ");
+        print_reg(op2);
+        printf("\n"); 
+    }
+    | Expression '>' Expression                             { 
+
+        lvalue_check($3); 
+        $$ = 0; 
+        reg_node *op2 = pop(), *op1 = pop(), *temp = newNode("t", ++t_ctr); 
+        icg_stack[++icg_tos] = temp; 
+
+        printf("%5d. ", tac_lineno++);
+        print_reg(temp);
+        printf(" = ");
+        print_reg(op1);
+        printf(" > ");
+        print_reg(op2);
+        printf("\n"); 
+    }
     | Expression '-' Expression                             { 
         
         lvalue_check($3); 
@@ -111,10 +160,63 @@ Expression
         print_reg(op2);
         printf("\n");
     }
-    | Expression '*' Expression                             { lvalue_check($3); $$ = 0; }
-    | Expression '/' Expression                             { lvalue_check($3); $$ = 0; }
-    | Expression '%' Expression                             { lvalue_check($3); $$ = 0; }
-    | IDENTIFIER '=' Expression                             { $$ = 1; }
+    | Expression '*' Expression                             { 
+
+        lvalue_check($3); 
+        $$ = 0; 
+        reg_node *op2 = pop(), *op1 = pop(), *temp = newNode("t", ++t_ctr); 
+        icg_stack[++icg_tos] = temp; 
+
+        printf("%5d. ", tac_lineno++);
+        print_reg(temp);
+        printf(" = ");
+        print_reg(op1);
+        printf(" + ");
+        print_reg(op2);
+        printf("\n"); 
+    }
+    | Expression '/' Expression                             { 
+
+        lvalue_check($3); 
+        $$ = 0; 
+        reg_node *op2 = pop(), *op1 = pop(), *temp = newNode("t", ++t_ctr); 
+        icg_stack[++icg_tos] = temp; 
+
+        printf("%5d. ", tac_lineno++);
+        print_reg(temp);
+        printf(" = ");
+        print_reg(op1);
+        printf(" / ");
+        print_reg(op2);
+        printf("\n"); 
+    }
+    | Expression '%' Expression                             { 
+
+        lvalue_check($3); 
+        $$ = 0; 
+        reg_node *op2 = pop(), *op1 = pop(), *temp = newNode("t", ++t_ctr); 
+        icg_stack[++icg_tos] = temp; 
+
+        printf("%5d. ", tac_lineno++);
+        print_reg(temp);
+        printf(" = ");
+        print_reg(op1);
+        printf(" %% ");
+        print_reg(op2);
+        printf("\n"); 
+    }
+    | IDENTIFIER '=' Expression                             { 
+        
+        $$ = 1; 
+        reg_node *op = pop(), *temp = newNode($1, -1); 
+        icg_stack[++icg_tos] = temp; 
+
+        printf("%5d. ", tac_lineno++);
+        print_reg(temp);
+        printf(" = ");
+        print_reg(op);
+        printf("\n"); 
+    }
     | Expression PLUSEQ Expression                          { $$ = 1; }
     | '(' Expression ')'                                    { $$ = 0; }
     ;
@@ -195,12 +297,45 @@ SingleStat
     ;
 
 IfStat
-    : IF '(' Expression ')' CompundStat                     %prec IfWithoutElse
-    | IF '(' Expression ')' SingleStat                      %prec IfWithoutElse
-    | IF '(' Expression ')' CompundStat ELSE CompundStat    %prec ELSE
-    | IF '(' Expression ')' SingleStat ELSE CompundStat     %prec ELSE
-    | IF '(' Expression ')' CompundStat ELSE SingleStat     %prec ELSE
-    | IF '(' Expression ')' SingleStat ELSE SingleStat      %prec ELSE
+    : IF '(' Expression ')' IfTAC_Print CompundStat                                     { printf("L%d", $5); printf(":\n"); } %prec IfWithoutElse
+    | IF '(' Expression ')' IfTAC_Print SingleStat                                      { printf("L%d", $5); printf(":\n"); } %prec IfWithoutElse
+    | IF '(' Expression ')' IfTAC_Print CompundStat ELSE ElseTAC_Print                  { printf("L%d", $5); printf(":\n"); } 
+        CompundStat                                                                     { printf("L%d", $8); printf(":\n"); } %prec ELSE
+    | IF '(' Expression ')' IfTAC_Print SingleStat  ELSE ElseTAC_Print                  { printf("L%d", $5); printf(":\n"); } 
+        CompundStat                                                                     { printf("L%d", $8); printf(":\n"); } %prec ELSE
+    | IF '(' Expression ')' IfTAC_Print CompundStat ELSE ElseTAC_Print                  { printf("L%d", $5); printf(":\n"); }
+        SingleStat                                                                      { printf("L%d", $8); printf(":\n"); } %prec ELSE
+    | IF '(' Expression ')' IfTAC_Print SingleStat  ELSE ElseTAC_Print                  { printf("L%d", $5); printf(":\n"); }
+        SingleStat                                                                      { printf("L%d", $8); printf(":\n"); } %prec ELSE
+    ;
+
+IfTAC_Print
+    : {
+        reg_node *op = pop();
+        reg_node *temp = newNode("t", ++t_ctr);
+        
+        printf("%5d. ", tac_lineno++);
+        print_reg(temp);
+        printf(" = NOT ");
+        print_reg(op);
+
+        printf("\n%5d. IF ", tac_lineno++);
+        print_reg(temp);
+        printf(" GOTO L%d\n", label_num);
+
+        $$ = label_num;
+        t_ctr--;
+        label_num++;
+    }
+    ;
+
+ElseTAC_Print
+    : {
+        printf("%5d. GOTO L%d\n", tac_lineno++, label_num);
+        $$ = label_num;
+        label_num++;
+    }
+    ;
 
 ForStat
     : FOR '(' VarDec ';' Expression ';' Expression ')' CompundStat
@@ -234,8 +369,8 @@ int main() {
     printf("\n====== Three Address Code ======\n");
     yyparse();
     printf("================================\n");
-    printf("\nSymbol Table\n");
-    printSymbolTable();
+    // printf("\nSymbol Table\n");
+    // printSymbolTable();
 }
 
 /*
