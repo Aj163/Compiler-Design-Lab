@@ -24,6 +24,7 @@ alphanum    ({letter}|{number})
 }
 
 int         { yylval.str = malloc(100 * sizeof(char)); strcpy(yylval.str, yytext); return INT; }
+while       { yylval.str = malloc(100 * sizeof(char)); strcpy(yylval.str, yytext); return WHILE; }
 char        { yylval.str = malloc(100 * sizeof(char)); strcpy(yylval.str, yytext); return CHAR; }
 main        { yylval.str = malloc(100 * sizeof(char)); strcpy(yylval.str, yytext); return MAIN; }
 for         { yylval.str = malloc(100 * sizeof(char)); strcpy(yylval.str, yytext); return FOR; }
