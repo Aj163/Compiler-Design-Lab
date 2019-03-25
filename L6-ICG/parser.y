@@ -251,26 +251,46 @@ DataType
     ;
 
 FunDef
-    : DataType IDENTIFIER ParenthesisOpen ParamList ParenthesisClose CompundStat    { 
-        redeclared($2); 
-        node *temp = insert(yylineno, $2, $1, curr_scope);
-        temp->num_params = $4;
-    }
-    | DataType MAIN ParenthesisOpen ParamList ParenthesisClose CompundStat          { 
-        redeclared($2); 
-        node *temp = insert(yylineno, $2, $1, curr_scope); 
-        temp->num_params = $4;
-    }
-    | DataType IDENTIFIER ParenthesisOpen ParenthesisClose CompundStat              { 
-        redeclared($2); 
-        node *temp = insert(yylineno, $2, $1, curr_scope);
-        temp->num_params = 0;
-    }
-    | DataType MAIN ParenthesisOpen ParenthesisClose CompundStat                    { 
-        redeclared($2); 
-        node *temp = insert(yylineno, $2, $1, curr_scope); 
-        temp->num_params = 0;
-    }
+    : DataType IDENTIFIER ParenthesisOpen ParamList ParenthesisClose {
+            printf("\nFUNCTION %s BEGIN\n", $2);
+        } 
+        CompundStat { 
+            redeclared($2); 
+            node *temp = insert(yylineno, $2, $1, curr_scope);
+            temp->num_params = $4;
+            printf("END %s\n", $2);
+            tac_lineno = 1;
+        }
+    | DataType MAIN ParenthesisOpen ParamList ParenthesisClose {
+            printf("\nFUNCTION %s BEGIN\n", $2);
+        } 
+        CompundStat { 
+            redeclared($2); 
+            node *temp = insert(yylineno, $2, $1, curr_scope); 
+            temp->num_params = $4;
+            printf("END %s\n", $2);
+            tac_lineno = 1;
+        }
+    | DataType IDENTIFIER ParenthesisOpen ParenthesisClose {
+            printf("\nFUNCTION %s BEGIN\n", $2);
+        } 
+        CompundStat { 
+            redeclared($2); 
+            node *temp = insert(yylineno, $2, $1, curr_scope);
+            temp->num_params = 0;
+            printf("END %s\n", $2);
+            tac_lineno = 1;
+        }
+    | DataType MAIN ParenthesisOpen ParenthesisClose {
+            printf("\nFUNCTION %s BEGIN\n", $2);
+        } 
+        CompundStat { 
+            redeclared($2); 
+            node *temp = insert(yylineno, $2, $1, curr_scope); 
+            temp->num_params = 0;
+            printf("END %s\n", $2);
+            tac_lineno = 1;
+        }
     ;
 
 CompundStat
@@ -377,12 +397,35 @@ ForStat
     ;
 
 ReturnStat
-    : RETURN Expression
-    | RETURN
+    : RETURN Expression {
+        printf("%5d. RETURN ", tac_lineno++);
+        reg_node *op = pop();
+        print_reg(op);
+        printf("\n");
+
+    }
+    | RETURN {
+        printf("%5d. RETURN\n", tac_lineno++);
+    }
 
 FuncCall
-    : IDENTIFIER '(' ArgList ')'                                                { not_declared($1); not_function($1); num_param_check($1, $3); }
-    | IDENTIFIER '(' ')'                                                        { not_declared($1); not_function($1); num_param_check($1, 0);  }
+    : IDENTIFIER '(' ArgList ')' { 
+        
+        not_declared($1); 
+        not_function($1); 
+        num_param_check($1, $3); 
+        
+        print_arg_list($3);
+        printf("%5d. CALL %s, %d\n", tac_lineno++, $1, $3);
+    }
+    | IDENTIFIER '(' ')' { 
+        
+        not_declared($1); 
+        not_function($1); 
+        num_param_check($1, 0); 
+
+        printf("%5d. CALL %s\n", tac_lineno++, $1);
+    }
     ;
 
 ArgList
@@ -415,5 +458,13 @@ Semantic Errors
 - Not a function
 - Number of parameters do not match
 - LHS of assignment should be a single variable
+
+ICG
+- If 
+- If Else
+- Expressions
+- Variable initialization
+- Function call
+- Function name
 
 */

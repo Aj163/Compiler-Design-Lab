@@ -36,3 +36,15 @@ reg_node *pop() {
         t_ctr--;
     return icg_stack[icg_tos--];
 }
+
+void print_arg_list(int cnt) {
+
+    if(cnt == 0)
+        return;
+
+    reg_node *temp = pop();
+    print_arg_list(cnt -1);
+    printf("%5d. PARAM ", tac_lineno++);
+    print_reg(temp);
+    printf("\n");
+}
