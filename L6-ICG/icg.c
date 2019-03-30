@@ -121,7 +121,14 @@ void printTAC() {
 
     printf("\n====== Three Address Code ======\n");
     while(temp != NULL) {
-        printf("%5d. %s\n", lineno++, temp->code);
+        if(temp->code[0] == 'L')
+            printf("%s:\n", temp->code);
+        else if(strstr(temp->code, "FUNCTION"))
+            printf("\n%s\n", temp->code);
+        else if(strstr(temp->code, "END"))
+            printf("%s\n", temp->code);
+        else
+            printf("%5d. %s\n", lineno++, temp->code);
         temp = temp->next;
     }
     printf("================================\n");
