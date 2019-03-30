@@ -9,7 +9,7 @@
 
 %token <str> CHAR INT MAIN FOR RETURN IF ELSE VOID WHILE
 %token <str> STRING_CONSTANT INTEGER_CONSTANT FLOAT_CONSTANT IDENTIFIER
-%token <str> INCREMENT DECREMENT PLUSEQ
+%token <str> INCREMENT DECREMENT PLUSEQ CONTINUE BREAK
 
 %left '=' PLUSEQ
 %left '>' '<'
@@ -257,6 +257,22 @@ SingleStat
     | ReturnStat ';'
     | ';'
     | IfStat
+    | CONTINUE ';' {
+        if(continueStack.top == -1) {
+            printf("Line %d : a continue statement may only be used within a loop\n", yylineno);
+            exit(1);
+        }
+        curr_buff = get_buff_node();
+        sprintf(curr_buff->code, "GOTO L%d", continueStack.label[continueStack.top]);
+    }
+    | BREAK ';' {
+        if(breakStack.top == -1) {
+            printf("Line %d : a break statement may only be used within a loop\n", yylineno);
+            exit(1);
+        }
+        curr_buff = get_buff_node();
+        sprintf(curr_buff->code, "GOTO L%d", breakStack.label[breakStack.top]);
+    }
     ;
 
 WhileStat
@@ -280,6 +296,7 @@ WhileCondTAC
     : {
         curr_buff = get_buff_node();
         sprintf(curr_buff->code, "L%d", label_num);
+        continueStack.label[++continueStack.top] = label_num;
         $$ = label_num++;
     }
     ;
@@ -294,6 +311,7 @@ WhileBodyTAC
         curr_buff = get_buff_node();
         sprintf(curr_buff->code, "IF %s GOTO L%d", reg_name(temp), label_num);
 
+        breakStack.label[++breakStack.top] = label_num;
         $$ = label_num++;
         t_ctr--;
     }
@@ -347,6 +365,7 @@ ForCondLabel
     : {
         curr_buff = get_buff_node();
         sprintf(curr_buff->code, "L%d", label_num);
+        continueStack.label[++continueStack.top] = label_num;
         $$ = label_num++;
     }
     ;
@@ -356,6 +375,7 @@ ForCondExit
         reg_node *temp = pop();
         curr_buff = get_buff_node();
         sprintf(curr_buff->code, "IF NOT %s GOTO L%d", reg_name(temp), label_num);
+        breakStack.label[++breakStack.top] = label_num;
         $$ = label_num++;
         tac.top++;
     }
@@ -410,6 +430,9 @@ int main() {
     tac.top = 0;
     tac.head[tac.top] = NULL;
     tac.last[tac.top] = NULL;
+
+    continueStack.top = -1;
+    breakStack.top = -1;
 
     yyparse();
     // printSymbolTable();

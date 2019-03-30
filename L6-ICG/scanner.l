@@ -32,6 +32,8 @@ return      { print(yytext); yylval.str = malloc(100 * sizeof(char)); strcpy(yyl
 if          { yylval.str = malloc(100 * sizeof(char)); strcpy(yylval.str, yytext); return IF; }
 else        { yylval.str = malloc(100 * sizeof(char)); strcpy(yylval.str, yytext); return ELSE; }
 void        { yylval.str = malloc(100 * sizeof(char)); strcpy(yylval.str, yytext); return VOID; }
+continue    { yylval.str = malloc(100 * sizeof(char)); strcpy(yylval.str, yytext); return CONTINUE; }
+break       { yylval.str = malloc(100 * sizeof(char)); strcpy(yylval.str, yytext); return BREAK; }
 
 "#include"[ ]*"<"(_|{letter})(_|{alphanum})*".h>"  { 
     

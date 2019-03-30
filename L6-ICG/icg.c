@@ -19,6 +19,13 @@ typedef struct TAC {
     buffer_node *last[100];
 } TAC;
 
+typedef struct {
+    int top;
+    int label[100];
+} labelStack;
+
+labelStack continueStack, breakStack;
+
 TAC tac;
 buffer_node *curr_buff;
 char temp_code[100];
