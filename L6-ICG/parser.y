@@ -19,7 +19,7 @@
 
 %type <str> DataType
 %type <intval> ConstExpression ParamList ListOfParams ArgList Expression IfTAC ElseTAC
-%type <intval> WhileBodyTAC WhileCondTAC
+%type <intval> WhileBodyTAC WhileCondTAC ForCondExit ForCondLabel
 
 %nonassoc IfWithoutElse
 %nonassoc ELSE
@@ -68,22 +68,19 @@ VarList
             insert(yylineno, $1, type, curr_scope); 
             reg_node *op = pop(); 
 
-            printf("%5d. ", tac_lineno++);
-            printf("%s = ", $1);
-            print_reg(op);
-            printf("\n"); 
+            curr_buff = get_buff_node();
+            sprintf(curr_buff->code, "%s = %s", $1, reg_name(op));
         }
         ',' VarList  
+
     | IDENTIFIER '=' Expression                                     { 
         
         redeclared($1); 
         insert(yylineno, $1, type, curr_scope); 
         reg_node *op = pop(); 
 
-        printf("%5d. ", tac_lineno++);
-        printf("%s = ", $1);
-        print_reg(op);
-        printf("\n"); 
+        curr_buff = get_buff_node();
+        sprintf(curr_buff->code, "%s = %s", $1, reg_name(op)); 
     }
     ;
 
@@ -102,109 +99,46 @@ ConstExpression
 Expression
     : Term                                                  { $$ = 0; }
     | Expression '+' Expression                             { 
-        
+
         lvalue_check($3); 
         $$ = 0; 
-        reg_node *op2 = pop(), *op1 = pop(), *temp = newNode("t", ++t_ctr); 
-        icg_stack[++icg_tos] = temp; 
-
-        printf("%5d. ", tac_lineno++);
-        print_reg(temp);
-        printf(" = ");
-        print_reg(op1);
-        printf(" + ");
-        print_reg(op2);
-        printf("\n"); 
+        exprTAC("+");
     }
     | Expression '<' Expression                             { 
         
         lvalue_check($3); 
         $$ = 0; 
-        reg_node *op2 = pop(), *op1 = pop(), *temp = newNode("t", ++t_ctr); 
-        icg_stack[++icg_tos] = temp; 
-
-        printf("%5d. ", tac_lineno++);
-        print_reg(temp);
-        printf(" = ");
-        print_reg(op1);
-        printf(" < ");
-        print_reg(op2);
-        printf("\n"); 
+        exprTAC("<");
     }
     | Expression '>' Expression                             { 
 
         lvalue_check($3); 
         $$ = 0; 
-        reg_node *op2 = pop(), *op1 = pop(), *temp = newNode("t", ++t_ctr); 
-        icg_stack[++icg_tos] = temp; 
-
-        printf("%5d. ", tac_lineno++);
-        print_reg(temp);
-        printf(" = ");
-        print_reg(op1);
-        printf(" > ");
-        print_reg(op2);
-        printf("\n"); 
+        exprTAC(">"); 
     }
     | Expression '-' Expression                             { 
         
         lvalue_check($3); 
         $$ = 0; 
-        reg_node *op2 = pop(), *op1 = pop(), *temp = newNode("t", ++t_ctr); 
-        icg_stack[++icg_tos] = temp; 
-
-        printf("%5d. ", tac_lineno++);
-        print_reg(temp);
-        printf(" = ");
-        print_reg(op1);
-        printf(" - ");
-        print_reg(op2);
-        printf("\n");
+        exprTAC("-");
     }
     | Expression '*' Expression                             { 
 
         lvalue_check($3); 
         $$ = 0; 
-        reg_node *op2 = pop(), *op1 = pop(), *temp = newNode("t", ++t_ctr); 
-        icg_stack[++icg_tos] = temp; 
-
-        printf("%5d. ", tac_lineno++);
-        print_reg(temp);
-        printf(" = ");
-        print_reg(op1);
-        printf(" + ");
-        print_reg(op2);
-        printf("\n"); 
+        exprTAC("*");
     }
     | Expression '/' Expression                             { 
 
         lvalue_check($3); 
         $$ = 0; 
-        reg_node *op2 = pop(), *op1 = pop(), *temp = newNode("t", ++t_ctr); 
-        icg_stack[++icg_tos] = temp; 
-
-        printf("%5d. ", tac_lineno++);
-        print_reg(temp);
-        printf(" = ");
-        print_reg(op1);
-        printf(" / ");
-        print_reg(op2);
-        printf("\n"); 
+        exprTAC("/");
     }
     | Expression '%' Expression                             { 
 
         lvalue_check($3); 
         $$ = 0; 
-        reg_node *op2 = pop(), *op1 = pop(), *temp = newNode("t", ++t_ctr); 
-        icg_stack[++icg_tos] = temp; 
-
-        printf("%5d. ", tac_lineno++);
-        print_reg(temp);
-        printf(" = ");
-        print_reg(op1);
-        printf(" %% ");
-        print_reg(op2);
-        printf("\n"); 
+        exprTAC("%");
     }
     | IDENTIFIER '=' Expression                             { 
         
@@ -212,14 +146,13 @@ Expression
         reg_node *op = pop(), *temp = newNode($1, -1); 
         icg_stack[++icg_tos] = temp; 
 
-        printf("%5d. ", tac_lineno++);
-        print_reg(temp);
-        printf(" = ");
-        print_reg(op);
-        printf("\n"); 
+        curr_buff = get_buff_node();
+        sprintf(curr_buff->code, "%s = %s", reg_name(temp), reg_name(op));
     }
     | Expression PLUSEQ Expression                          { $$ = 1; }
     | '(' Expression ')'                                    { $$ = 0; }
+    | '-' Expression                                        { $$ = 0; }
+    | '+' Expression                                        { $$ = 0; }
     ;
 
 Term
@@ -252,44 +185,52 @@ DataType
 
 FunDef
     : DataType IDENTIFIER ParenthesisOpen ParamList ParenthesisClose {
-            printf("\nFUNCTION %s BEGIN\n", $2);
+            curr_buff = get_buff_node();
+            sprintf(curr_buff->code, "FUNCTION %s BEGIN", $2);
         } 
         CompundStat { 
             redeclared($2); 
             node *temp = insert(yylineno, $2, $1, curr_scope);
             temp->num_params = $4;
-            printf("END %s\n", $2);
-            tac_lineno = 1;
+            
+            curr_buff = get_buff_node();
+            sprintf(curr_buff->code, "END %s", $2);
         }
     | DataType MAIN ParenthesisOpen ParamList ParenthesisClose {
-            printf("\nFUNCTION %s BEGIN\n", $2);
+            curr_buff = get_buff_node();
+            sprintf(curr_buff->code, "FUNCTION %s BEGIN", $2);
         } 
         CompundStat { 
             redeclared($2); 
             node *temp = insert(yylineno, $2, $1, curr_scope); 
             temp->num_params = $4;
-            printf("END %s\n", $2);
-            tac_lineno = 1;
+            
+            curr_buff = get_buff_node();
+            sprintf(curr_buff->code, "END %s", $2);
         }
     | DataType IDENTIFIER ParenthesisOpen ParenthesisClose {
-            printf("\nFUNCTION %s BEGIN\n", $2);
+            curr_buff = get_buff_node();
+            sprintf(curr_buff->code, "FUNCTION %s BEGIN", $2);
         } 
         CompundStat { 
             redeclared($2); 
             node *temp = insert(yylineno, $2, $1, curr_scope);
             temp->num_params = 0;
-            printf("END %s\n", $2);
-            tac_lineno = 1;
+            
+            curr_buff = get_buff_node();
+            sprintf(curr_buff->code, "END %s", $2);
         }
     | DataType MAIN ParenthesisOpen ParenthesisClose {
-            printf("\nFUNCTION %s BEGIN\n", $2);
+            curr_buff = get_buff_node();
+            sprintf(curr_buff->code, "FUNCTION %s BEGIN", $2);
         } 
         CompundStat { 
             redeclared($2); 
             node *temp = insert(yylineno, $2, $1, curr_scope); 
             temp->num_params = 0;
-            printf("END %s\n", $2);
-            tac_lineno = 1;
+
+            curr_buff = get_buff_node();
+            sprintf(curr_buff->code, "END %s", $2);
         }
     ;
 
@@ -309,7 +250,7 @@ StatList
     ;
 
 SingleStat
-    : Expression ';'
+    : Expression ';' { pop(); }
     | VarDec ';'
     | ForStat
     | WhileStat
@@ -319,14 +260,26 @@ SingleStat
     ;
 
 WhileStat
-    : WHILE WhileCondTAC '(' Expression ')' WhileBodyTAC CompundStat        { printf("%5d. GOTO L%d\nL%d", tac_lineno++, $2, $6); printf(":\n"); }
-    | WHILE WhileCondTAC '(' Expression ')' WhileBodyTAC SingleStat         { printf("%5d. GOTO L%d\nL%d", tac_lineno++, $2, $6); printf(":\n"); }
+    : WHILE WhileCondTAC '(' Expression ')' WhileBodyTAC CompundStat        { 
+        
+        curr_buff = get_buff_node();
+        sprintf(curr_buff->code, "GOTO L%d", $2);
+        curr_buff = get_buff_node();
+        sprintf(curr_buff->code, "L%d", $6);
+    }
+    | WHILE WhileCondTAC '(' Expression ')' WhileBodyTAC SingleStat         { 
+        
+        curr_buff = get_buff_node();
+        sprintf(curr_buff->code, "GOTO L%d", $2);
+        curr_buff = get_buff_node();
+        sprintf(curr_buff->code, "L%d", $6);
+    }
     ;
 
 WhileCondTAC
     : {
-        printf("L%d", label_num);
-        printf(":\n");
+        curr_buff = get_buff_node();
+        sprintf(curr_buff->code, "L%d", label_num);
         $$ = label_num++;
     }
     ;
@@ -335,15 +288,11 @@ WhileBodyTAC
     : {
         reg_node *op = pop();
         reg_node *temp = newNode("t", ++t_ctr);
-        
-        printf("%5d. ", tac_lineno++);
-        print_reg(temp);
-        printf(" = NOT ");
-        print_reg(op);
 
-        printf("\n%5d. IF ", tac_lineno++);
-        print_reg(temp);
-        printf(" GOTO L%d\n", label_num);
+        curr_buff = get_buff_node();
+        sprintf(curr_buff->code, "%s = NOT %s", reg_name(temp), reg_name(op));
+        curr_buff = get_buff_node();
+        sprintf(curr_buff->code, "IF %s GOTO L%d", reg_name(temp), label_num);
 
         $$ = label_num++;
         t_ctr--;
@@ -351,32 +300,29 @@ WhileBodyTAC
     ;
 
 IfStat
-    : IF '(' Expression ')' IfTAC CompundStat                               { printf("L%d", $5); printf(":\n"); } %prec IfWithoutElse
-    | IF '(' Expression ')' IfTAC SingleStat                                { printf("L%d", $5); printf(":\n"); } %prec IfWithoutElse
-    | IF '(' Expression ')' IfTAC CompundStat ELSE ElseTAC                  { printf("L%d", $5); printf(":\n"); } 
-        CompundStat                                                         { printf("L%d", $8); printf(":\n"); } %prec ELSE
-    | IF '(' Expression ')' IfTAC SingleStat  ELSE ElseTAC                  { printf("L%d", $5); printf(":\n"); } 
-        CompundStat                                                         { printf("L%d", $8); printf(":\n"); } %prec ELSE
-    | IF '(' Expression ')' IfTAC CompundStat ELSE ElseTAC                  { printf("L%d", $5); printf(":\n"); }
-        SingleStat                                                          { printf("L%d", $8); printf(":\n"); } %prec ELSE
-    | IF '(' Expression ')' IfTAC SingleStat  ELSE ElseTAC                  { printf("L%d", $5); printf(":\n"); }
-        SingleStat                                                          { printf("L%d", $8); printf(":\n"); } %prec ELSE
+    : IF '(' Expression ')' IfTAC CompundStat                               { curr_buff = get_buff_node(); sprintf(curr_buff->code, "L%d", $5); } %prec IfWithoutElse
+    | IF '(' Expression ')' IfTAC SingleStat                                { curr_buff = get_buff_node(); sprintf(curr_buff->code, "L%d", $5); } %prec IfWithoutElse
+    | IF '(' Expression ')' IfTAC CompundStat ELSE ElseTAC                  { curr_buff = get_buff_node(); sprintf(curr_buff->code, "L%d", $5); }
+        CompundStat                                                         { curr_buff = get_buff_node(); sprintf(curr_buff->code, "L%d", $8); } %prec ELSE
+    | IF '(' Expression ')' IfTAC SingleStat  ELSE ElseTAC                  { curr_buff = get_buff_node(); sprintf(curr_buff->code, "L%d", $5); } 
+        CompundStat                                                         { curr_buff = get_buff_node(); sprintf(curr_buff->code, "L%d", $8); } %prec ELSE
+    | IF '(' Expression ')' IfTAC CompundStat ELSE ElseTAC                  { curr_buff = get_buff_node(); sprintf(curr_buff->code, "L%d", $5); }
+        SingleStat                                                          { curr_buff = get_buff_node(); sprintf(curr_buff->code, "L%d", $8); } %prec ELSE
+    | IF '(' Expression ')' IfTAC SingleStat  ELSE ElseTAC                  { curr_buff = get_buff_node(); sprintf(curr_buff->code, "L%d", $5); }
+        SingleStat                                                          { curr_buff = get_buff_node(); sprintf(curr_buff->code, "L%d", $8); } %prec ELSE
     ;
 
 IfTAC
     : {
         reg_node *op = pop();
         reg_node *temp = newNode("t", ++t_ctr);
+
+        curr_buff = get_buff_node();
+        sprintf(curr_buff->code, "%s = NOT %s", reg_name(temp), reg_name(op));
+
+        curr_buff = get_buff_node();
+        sprintf(curr_buff->code, "IF %s GOTO L%d", reg_name(temp), label_num);
         
-        printf("%5d. ", tac_lineno++);
-        print_reg(temp);
-        printf(" = NOT ");
-        print_reg(op);
-
-        printf("\n%5d. IF ", tac_lineno++);
-        print_reg(temp);
-        printf(" GOTO L%d\n", label_num);
-
         $$ = label_num++;
         t_ctr--;
     }
@@ -384,28 +330,46 @@ IfTAC
 
 ElseTAC
     : {
-        printf("%5d. GOTO L%d\n", tac_lineno++, label_num);
+        curr_buff = get_buff_node();
+        sprintf(curr_buff->code, "GOTO L%d", label_num);
         $$ = label_num++;
     }
     ;
 
 ForStat
-    : FOR '(' VarDec ';' Expression ';' Expression ')' CompundStat
-    | FOR '(' Expression ';' Expression ';' Expression ')' CompundStat
-    | FOR '(' VarDec ';' Expression ';' Expression ')' SingleStat
-    | FOR '(' Expression ';' Expression ';' Expression ')' SingleStat
+    : FOR '(' VarDec     ';' ForCondLabel Expression ';' ForCondExit Expression ')' { tac.top++; } CompundStat  { forTAC($5, $8); }
+    | FOR '(' Expression ';' ForCondLabel Expression ';' ForCondExit Expression ')' { tac.top++; } CompundStat  { forTAC($5, $8); }
+    | FOR '(' VarDec     ';' ForCondLabel Expression ';' ForCondExit Expression ')' { tac.top++; } SingleStat   { forTAC($5, $8); }
+    | FOR '(' Expression ';' ForCondLabel Expression ';' ForCondExit Expression ')' { tac.top++; } SingleStat   { forTAC($5, $8); }
     ;
+
+ForCondLabel
+    : {
+        curr_buff = get_buff_node();
+        sprintf(curr_buff->code, "L%d", label_num);
+        $$ = label_num++;
+    }
+    ;
+
+ForCondExit
+    : {
+        reg_node *temp = pop();
+        curr_buff = get_buff_node();
+        sprintf(curr_buff->code, "IF NOT %s GOTO L%d", reg_name(temp), label_num);
+        $$ = label_num++;
+        tac.top++;
+    }
 
 ReturnStat
     : RETURN Expression {
-        printf("%5d. RETURN ", tac_lineno++);
-        reg_node *op = pop();
-        print_reg(op);
-        printf("\n");
 
+        reg_node *op = pop();
+        curr_buff = get_buff_node();
+        sprintf(curr_buff->code, "RETURN %s", reg_name(op));
     }
     | RETURN {
-        printf("%5d. RETURN\n", tac_lineno++);
+        curr_buff = get_buff_node();
+        sprintf(curr_buff->code, "RETURN");
     }
 
 FuncCall
@@ -414,9 +378,10 @@ FuncCall
         not_declared($1); 
         not_function($1); 
         num_param_check($1, $3); 
-        
+
         print_arg_list($3);
-        printf("%5d. CALL %s, %d\n", tac_lineno++, $1, $3);
+        curr_buff = get_buff_node();
+        sprintf(curr_buff->code, "CALL %s, %d", $1, $3);
     }
     | IDENTIFIER '(' ')' { 
         
@@ -424,7 +389,8 @@ FuncCall
         not_function($1); 
         num_param_check($1, 0); 
 
-        printf("%5d. CALL %s\n", tac_lineno++, $1);
+        curr_buff = get_buff_node();
+        sprintf(curr_buff->code, "CALL %s", $1);
     }
     ;
 
@@ -441,11 +407,13 @@ int main() {
     dummy->scope = -1;
     stack[tos] = dummy;
 
-    printf("\n====== Three Address Code ======\n");
+    tac.top = 0;
+    tac.head[tac.top] = NULL;
+    tac.last[tac.top] = NULL;
+
     yyparse();
-    printf("================================\n");
-    // printf("\nSymbol Table\n");
     // printSymbolTable();
+    printTAC();
 }
 
 /*
@@ -466,5 +434,6 @@ ICG
 - Variable initialization
 - Function call
 - Function name
+- For Loop
 
 */

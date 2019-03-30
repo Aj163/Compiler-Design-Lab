@@ -127,6 +127,7 @@ void not_declared(const char *name) {
 
 void printSymbolTable() {
 
+    printf("\nSymbol Table\n");
     printf("------------------------------------------------------------\n");
     printf("|%-10s|%-15s|%-20s|%-10s|\n", "Line No", "Data Type", "Name", "Scope");
     printf("------------------------------------------------------------\n");
