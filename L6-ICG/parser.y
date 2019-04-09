@@ -142,6 +142,7 @@ Expression
     }
     | IDENTIFIER '=' Expression                             { 
         
+        not_declared($1);
         $$ = 1; 
         reg_node *op = pop(), *temp = newNode($1, -1); 
         icg_stack[++icg_tos] = temp; 
@@ -435,7 +436,7 @@ int main() {
     breakStack.top = -1;
 
     yyparse();
-    // printSymbolTable();
+    printSymbolTable();
     printTAC();
 }
 
