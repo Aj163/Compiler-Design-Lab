@@ -55,9 +55,9 @@ node *insert(int lineNo, const char *name, const char *type, int scope) {
     return temp;
 }
 
-void lvalue_check(int isNotModifiable) {
+void lvalue_check(int isModifiable) {
 
-    if(isNotModifiable) {
+    if(!isModifiable) {
         printf("Line %d: lvalue required as left operand of assignment.\n", yylineno);
         exit(1);
     }

@@ -18,7 +18,7 @@
 %left INCREMENT DECREMENT
 
 %type <str> DataType
-%type <intval> ConstExpression ParamList ListOfParams ArgList Expression
+%type <intval> ConstExpression ParamList ListOfParams ArgList Expression Term
 
 %nonassoc IfWithoutElse
 %nonassoc ELSE
@@ -78,29 +78,29 @@ ConstExpression
     ;
 
 Expression
-    : Term                                                  { $$ = 0; }
-    | Expression '+' Expression                             { lvalue_check($3); $$ = 0; }
-    | Expression '<' Expression                             { lvalue_check($3); $$ = 0; }
-    | Expression '>' Expression                             { lvalue_check($3); $$ = 0; }
-    | Expression '-' Expression                             { lvalue_check($3); $$ = 0; }
-    | Expression '*' Expression                             { lvalue_check($3); $$ = 0; }
-    | Expression '/' Expression                             { lvalue_check($3); $$ = 0; }
-    | Expression '%' Expression                             { lvalue_check($3); $$ = 0; }
-    | IDENTIFIER '=' Expression                             { $$ = 1; }
-    | Expression PLUSEQ Expression                          { $$ = 1; }
-    | '(' Expression ')'                                    { $$ = 0; }
+    : Term                                                  { $$ = $1; }
+    | Expression '+' Expression                             { $$ = 0; }
+    | Expression '<' Expression                             { $$ = 0; }
+    | Expression '>' Expression                             { $$ = 0; }
+    | Expression '-' Expression                             { $$ = 0; }
+    | Expression '*' Expression                             { $$ = 0; }
+    | Expression '/' Expression                             { $$ = 0; }
+    | Expression '%' Expression                             { $$ = 0; }
+    | Expression '=' Expression                             { lvalue_check($1); $$ = $3; }
+    | Expression PLUSEQ Expression                          { $$ = $3; }
+    | '(' Expression ')'                                    { $$ = $2; }
     ;
 
 Term
-    : IDENTIFIER                                                { not_declared($1); }
-    | INCREMENT IDENTIFIER                                      { not_declared($2); }
-    | IDENTIFIER INCREMENT                                      { not_declared($1); }
-    | DECREMENT IDENTIFIER                                      { not_declared($2); }
-    | IDENTIFIER DECREMENT                                      { not_declared($1); }
-    | INTEGER_CONSTANT
-    | FLOAT_CONSTANT
-    | STRING_CONSTANT
-    | FuncCall
+    : IDENTIFIER                                                { not_declared($1); $$ = 1; }
+    | INCREMENT IDENTIFIER                                      { not_declared($2); $$ = 0; }
+    | IDENTIFIER INCREMENT                                      { not_declared($1); $$ = 0; }
+    | DECREMENT IDENTIFIER                                      { not_declared($2); $$ = 0; }
+    | IDENTIFIER DECREMENT                                      { not_declared($1); $$ = 0; }
+    | INTEGER_CONSTANT                                          { $$ = 0; }
+    | FLOAT_CONSTANT                                            { $$ = 0; }
+    | STRING_CONSTANT                                           { $$ = 0; }
+    | FuncCall                                                  { $$ = 0; }
     ;
 
 ListOfParams
